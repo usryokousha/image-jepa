@@ -1,7 +1,6 @@
 import logging
 
 from . import transformer
-from .transformer import Transformer
 from .components import (ContextEncoder, TargetEncoder, Predictor)
 from ..layers import VisionEmbedding, LatentEmbedding, MaskEmbedding, PositionEmbedding
 
@@ -58,7 +57,11 @@ def build_ijepa_models(config):
         signal_embed=target_signal_embed,
         transformer=target_transformer(**transformer_kwargs))
     
-    logger.info(f"Context Encoder embedding dim: {context_encoder.transformer.embed_dim}")
-    logger.info(f"Target Encoder embedding dim: {target_encoder.transformer.embed_dim}")
-    logger.info(f"Predictor embedding dim: {predictor.transformer.embed_dim}")
+    logger.info(f"OPTIONS -- Context Encoder : embed_dim: {context_encoder.transformer.embed_dim}")
+    logger.info(f"OPTIONS -- Target Encoder : embed_dim: {target_encoder.transformer.embed_dim}")
+    logger.info(f"OPTIONS -- architecture : embed_dim: {predictor.transformer.embed_dim}")
     return context_encoder, target_encoder, predictor
+
+def build_jepa_models(config):
+    if config.jepa_arch == "ijepa":
+        return build_ijepa_models(config)

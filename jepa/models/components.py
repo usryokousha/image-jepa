@@ -33,6 +33,7 @@ class ContextEncoder(nn.Module):
         super().__init__()
         self.signal_embed = signal_embed
         self.transformer = transformer
+        self.head_dim = head_dim
         self.head = nn.Linear(transformer.embed_dim, head_dim)
 
     def forward(self, signal: Tensor , context_mask: Tensor, num_splits: int = 1) -> List[Tensor]:
@@ -51,9 +52,10 @@ class TargetEncoder(nn.Module):
     ):
         super().__init__()
         self.signal_embed = signal_embed
-        self.head = nn.Linear(transformer.embed_dim, head_dim)
         self.transformer = transformer
-
+        self.head_dim = head_dim
+        self.head = nn.Linear(transformer.embed_dim, head_dim)
+        
     def forward(self, signal: Tensor , target_mask: Tensor, num_targets: int = 4, num_splits: int = 1) -> Union[Tensor, List[Tensor]]:
         target_mask_list = torch.chunk(target_mask, num_targets, dim=0)
         target_mask_list = [torch.chunk(m, num_splits, dim=0) for m in target_mask_list]
@@ -84,6 +86,7 @@ class Predictor(nn.Module):
         self.mask_embed = mask_embed
         self.latent_embed = latent_embed
         self.transformer = transformer
+        self.head_dim = head_dim
         self.head = nn.Linear(transformer.embed_dim, head_dim)
 
     def forward_features_list(self, 

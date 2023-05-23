@@ -11,6 +11,7 @@
 from typing import Callable, Optional, Tuple, Union
 
 import math
+import numpy as np
 import torch
 from torch import Tensor
 import torch.nn as nn
@@ -30,6 +31,23 @@ def make_2tuple(x):
 
 def extract_valid_region(x, mask):
     return x.masked_select(mask).reshape(x.shape[0], -1, x.shape[-1])
+
+def get_sinusoid_encoding_table(n_position, d_hid):
+    """Sinusoid position encoding table"""
+
+    def get_position_angle_vec(position):
+        return [
+            position / np.power(10000, 2 * (hid_j // 2) / d_hid)
+            for hid_j in range(d_hid)
+        ]
+
+    sinusoid_table = np.array(
+        [get_position_angle_vec(pos_i) for pos_i in range(n_position)]
+    )
+    sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
+    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
+
+    return torch.FloatTensor(sinusoid_table).unsqueeze(0)
 
 class PatchEmbed(nn.Module):
     """
@@ -105,6 +123,7 @@ class VisionEmbedding(PatchEmbed):
             embed_dim: int = 768,
             norm_layer: Optional[Callable] = None,
             cls_token: bool = False,
+            learnable_position: bool = False,
     ):
         super().__init__(
             img_size, 
@@ -114,7 +133,10 @@ class VisionEmbedding(PatchEmbed):
             norm_layer, 
             flatten_embedding=True)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) if cls_token else None
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_pos_embed, embed_dim))
+        if learnable_position:
+            self.pos_embed = nn.Parameter(torch.zeros(1, self.num_pos_embed, embed_dim))
+        else:
+            self.pos_embed = get_sinusoid_encoding_table(self.num_pos_embed, embed_dim)
 
         self.init_weights()
 
