@@ -23,4 +23,6 @@ def collate_data(
             
     context_masks = torch.stack(context_mask_list)
     target_masks = torch.stack(target_mask_list)
-    return torch.stack(batch), context_masks, target_masks
+    return {"images": torch.stack(batch), 
+            "collated_context_masks": context_masks, 
+            "collated_target_masks": target_masks}

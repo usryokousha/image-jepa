@@ -105,16 +105,23 @@ def off_diagonal(x):
 
 # Adapted from https://github.com/facebookresearch/vicreg/blob/main/main_vicreg.py
 class VICReg(nn.Module):
-    def __init__(self, backbone: nn.Module, embed_dim: int, num_features: int):
+    def __init__(self, 
+                 embed_dim: int, 
+                 num_features: int,
+                 sim_coeff: float = 1.0,
+                 std_coeff: float = 1.0,
+                 cov_coeff: float = 1.0):
         super().__init__()
+        sim_coeff = sim_coeff
+        std_coeff = std_coeff
+        cov_coeff = cov_coeff
         self.embed_dim = embed_dim
         self.num_features = num_features
-        self.backbone = backbone
         self.projector = Projector(self.embed_dim, num_features)
 
-    def forward(self, x, y):
-        x = self.projector(self.backbone(x))
-        y = self.projector(self.backbone(y))
+    def forward(self, student_features, teacher_features):
+        x = self.projector(student_features)
+        y = self.projector(teacher_features)
 
         repr_loss = F.mse_loss(x, y)
 
@@ -147,21 +154,21 @@ class Projector(nn.Module):
         out_dim,
         use_bn=False,
         nlayers=2,
-        hidden_dim=2048,
-        bottleneck_dim=256,
+        hidden_dim=None,
+        hidden_mult=4,
         mlp_bias=True,
-        normalize=False,
     ):
         super().__init__()
+        if hidden_dim is None:
+            hidden_dim = in_dim * hidden_mult
         nlayers = max(nlayers, 1)
-        self.normalize = normalize
-        self.mlp = _build_mlp(nlayers, in_dim, bottleneck_dim, hidden_dim=hidden_dim, use_bn=use_bn, bias=mlp_bias)
+        self.mlp = _build_mlp(nlayers, 
+                              in_dim, 
+                              out_dim, 
+                              hidden_dim=hidden_dim, 
+                              use_bn=use_bn, 
+                              bias=mlp_bias)
         self.apply(self._init_weights)
-        if normalize:
-            self.last_layer = weight_norm(nn.Linear(bottleneck_dim, out_dim, bias=False))
-            self.last_layer.weight_g.data.fill_(1)
-        else:
-            self.last_layer = nn.Linear(bottleneck_dim, out_dim, bias=False)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -170,12 +177,7 @@ class Projector(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        x = self.mlp(x)
-        eps = 1e-6 if x.dtype == torch.float16 else 1e-12
-        if self.normalize:
-            x = nn.functional.normalize(x, dim=-1, p=2, eps=eps)
-        x = self.last_layer(x)
-        return x
+        return self.mlp(x)
 
 
 def _build_mlp(nlayers, in_dim, bottleneck_dim, hidden_dim=None, use_bn=False, bias=True):
